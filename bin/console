@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+
+$:.unshift File.expand_path("../../lib", __FILE__)
+
+require 'securerandom'
+require 'pry'
+require 'redis'
+require 'redis/distributed'
+require 'benchmark'
+
+
+$hosts = ["redis://127.0.0.1:2001", "redis://127.0.0.1:2002"]
+
+$dr = Redis::Distributed.new($hosts)
+$r = Redis.new(url: $hosts.first)
+
+$dr.flushdb
+$r.flushdb
+('aaa'..'zzz').each { |k| $dr.set k, rand(1000) }
+(1000..1200).each { |k| $r.set k.to_s, SecureRandom.base64 }
+
+
+
+def quick_test
+  puts %Q{$dr.get "foo"                         -> #{$dr.get "foo"}}
+  puts %Q{$dr.get "bar"                         -> #{$dr.get "bar"}}
+  puts %Q{$dr.get "123"                         -> #{$dr.get "123"}}
+  puts %Q{$dr.get "qwe"                         -> #{$dr.get "qwe"}}
+  puts %Q{$dr.mget "foo", "bar", "123", "qwe"   -> #{$dr.mget "foo", "bar", "123", "qwe"}}
+  puts %Q{$dr.mget2 "foo", "bar", "123", "qwe"  -> #{$dr.mget2 "foo", "bar", "123", "qwe"}}
+end
+
+
+def benchmark
+  iterations = 100_000
+  keys = %w(foo bar 123 qwe 1010 zaa tom 000 abc cde 1234 rds blabla)
+  Benchmark.bmbm do |bm|
+    bm.report("hash ") do
+      iterations.times do
+        $dr.mget(*keys)
+      end
+    end
+
+    bm.report("index") do
+      iterations.times do
+        $dr.mget2(*keys)
+      end
+    end
+  end
+end
+
+Pry.start

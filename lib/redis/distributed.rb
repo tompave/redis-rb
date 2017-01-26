@@ -292,6 +292,24 @@ class Redis
       keys.map { |key| results[key] }
     end
 
+
+    def mget2(*keys)
+      m_nodes = keys.each_with_index.group_by { |key, index| node_for(key) }
+      # { "node1" => [["b", 1], ["c", 2]], "node2" => [["a", 0], ["d", 3]] }
+      out = Array.new(keys.length)
+
+      m_nodes.each do |node, pairs|
+        lookup_keys = pairs.map(&:first)
+        values = node.mget(*lookup_keys)
+
+        pairs.each_with_index do |(_k, orig_index), node_index|
+          out[orig_index] = values[node_index]
+        end
+      end
+
+      out
+    end
+
     def mapped_mget(*keys)
       raise CannotDistribute, :mapped_mget
     end
